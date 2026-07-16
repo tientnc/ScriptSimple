@@ -1,4 +1,5 @@
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const OUTPUT_LANGUAGES = Object.freeze({ en: 'English', vi: 'Vietnamese', es: 'Spanish', zh: 'Simplified Chinese', fr: 'French', ko: 'Korean' });
 
 const schema = {
   name: 'prescription_guide', strict: true,
@@ -29,11 +30,12 @@ export default async (request) => {
   if (!apiKey) return json(503, { error: 'Analysis is not configured yet. Add OPENROUTER_API_KEY, or use the sample guide.' });
 
   try {
-    const { image, language = 'English' } = await request.json();
+    const { image, locale = 'en' } = await request.json();
+    const language = OUTPUT_LANGUAGES[locale] || OUTPUT_LANGUAGES.en;
     if (!/^data:image\/(jpeg|png|webp);base64,/.test(image || '')) return json(400, { error: 'A JPG, PNG, or WebP image is required.' });
     if (image.length > 14_000_000) return json(413, { error: 'The image is too large. Please use one under 10 MB.' });
 
-    const prompt = `Read this prescription image and create a medicine guide in ${language}.
+    const prompt = `Read this prescription image, regardless of the language printed on it, and create a medicine guide in ${language}.
 
 Safety rules:
 - Transcribe only what is actually visible. Never invent a medicine name, strength, dose, frequency, duration, or route.

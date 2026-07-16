@@ -6,7 +6,7 @@ ScriptSimple turns a prescription photo into a plain-language medicine guide. It
 
 - Phone camera capture and desktop/mobile file upload
 - On-device checks for resolution, lighting, and likely blur
-- English or Vietnamese output
+- English, Vietnamese, Spanish, Simplified Chinese, French, or Korean interface and output
 - Structured medicine cards: name, function, visible directions, side effects, and uncertainty
 - Copy, text download, and print-friendly output
 - Built-in fictional sample, so the interface can be demonstrated without an API key
@@ -31,6 +31,28 @@ cp .env.example .env
 # Add your real OPENROUTER_API_KEY to .env
 netlify dev
 ```
+
+## Languages
+
+The language selector controls both:
+
+1. The major interface text, including capture instructions, photo-quality feedback, safety warnings, result labels, errors, and downloaded guides.
+2. The language requested from the AI for functions, directions, side effects, uncertainty notes, and other explanatory prose.
+
+The prescription itself may be written in a different language. Medicine names remain as printed so the user can compare them with the original.
+
+The initial supported interface/output languages are English, Vietnamese, Spanish, Simplified Chinese, French, and Korean. The browser language is used on first visit when supported, and the user's choice is saved locally.
+
+Translations live in `i18n.js` as stable message keys. HTML uses `data-i18n` attributes, while dynamic JavaScript calls `t("messageKey")`. This is the same basic pattern used by larger applications, although they often split each locale into a separate JSON file and use a library such as FormatJS or i18next once pluralization, dates, and many contributors make that worthwhile.
+
+To add a language:
+
+1. Add its code and display name to `languages` in `i18n.js`.
+2. Add a message dictionary, using English as the complete fallback.
+3. Add the option to the selector in `index.html`.
+4. Add the code-to-language-name mapping to `OUTPUT_LANGUAGES` in `netlify/functions/analyze.mjs`.
+5. Have a fluent speaker review medical and safety wording before release.
+
 
 ## Deploy to Netlify
 

@@ -8,7 +8,7 @@
     <title>ScriptSimple — Make prescriptions easier to understand</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&family=Noto+Serif:ital,wght@0,400;1,400&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -21,21 +21,25 @@
       </a>
       <div class="header-note">
         <span class="privacy-dot"></span>
-        Your photo isn't saved
+        <span data-i18n="privacy">Your photo isn't saved</span>
       </div>
     </header>
 
     <main>
       <section class="hero" id="start-screen">
-        <div class="eyebrow"><span>✦</span> Prescription, explained simply</div>
-        <h1>Know what each<br /><em>medicine is for.</em></h1>
-        <p class="hero-copy">Take a clear photo of a prescription. ScriptSimple turns it into a simple guide you can read, save, and share.</p>
+        <div class="eyebrow"><span>✦</span> <span data-i18n="eyebrow">Prescription, explained simply</span></div>
+        <h1 data-i18n-html="heroTitle">Know what each<br /><em>medicine is for.</em></h1>
+        <p class="hero-copy" data-i18n="heroCopy">Take a clear photo of a prescription. ScriptSimple turns it into a simple guide you can read, save, and share.</p>
 
         <div class="language-row">
-          <label for="language">Explain in</label>
+          <label for="language" data-i18n="explainIn">Language</label>
           <select id="language">
-            <option value="English">English</option>
-            <option value="Vietnamese">Tiếng Việt</option>
+            <option value="en">English</option>
+            <option value="vi">Tiếng Việt</option>
+            <option value="es">Español</option>
+            <option value="zh">简体中文</option>
+            <option value="fr">Français</option>
+            <option value="ko">한국어</option>
           </select>
         </div>
 
@@ -45,21 +49,21 @@
             <span class="scan-corner c1"></span><span class="scan-corner c2"></span>
             <span class="scan-corner c3"></span><span class="scan-corner c4"></span>
           </div>
-          <h2>Add your prescription</h2>
-          <p>Use the full page, in good light, with no glare.</p>
+          <h2 data-i18n="addPrescription">Add your prescription</h2>
+          <p data-i18n="photoTip">Use the full page, in good light, with no glare.</p>
           <div class="capture-actions">
             <button class="button primary" id="camera-button">
               <span class="button-icon" aria-hidden="true">⌾</span>
-              Take a photo
+              <span data-i18n="takePhoto">Take a photo</span>
             </button>
             <button class="button secondary" id="upload-button">
               <span class="button-icon" aria-hidden="true">↑</span>
-              Upload image
+              <span data-i18n="uploadImage">Upload image</span>
             </button>
           </div>
           <input id="camera-input" type="file" accept="image/*" capture="environment" hidden />
           <input id="upload-input" type="file" accept="image/jpeg,image/png,image/webp" hidden />
-          <button class="demo-link" id="demo-button">No prescription handy? Try a sample →</button>
+          <button class="demo-link" id="demo-button" data-i18n="trySample">No prescription handy? Try a sample →</button>
         </div>
 
         <div class="trust-row">
@@ -70,25 +74,25 @@
       </section>
 
       <section class="workspace hidden" id="review-screen" aria-labelledby="review-title">
-        <button class="back-link" data-back>← Start over</button>
+        <button class="back-link" data-back data-i18n="startOver">← Start over</button>
         <div class="step-indicator"><b>1</b><span></span><i>2</i><span></span><i>3</i></div>
         <div class="section-heading">
-          <div><p class="kicker">Step 1 of 3</p><h1 id="review-title">Check your photo</h1></div>
-          <p>Make sure every medicine name and instruction is readable before continuing.</p>
+          <div><p class="kicker" data-i18n="stepOne">Step 1 of 3</p><h1 id="review-title" data-i18n="checkPhoto">Check your photo</h1></div>
+          <p data-i18n="checkPhotoCopy">Make sure every medicine name and instruction is readable before continuing.</p>
         </div>
 
         <div class="review-grid">
           <div class="photo-panel">
             <img id="preview-image" alt="Your prescription preview" />
-            <div class="quality-badge" id="quality-badge">Checking image…</div>
+            <div class="quality-badge" id="quality-badge" data-i18n="qualityChecking">Checking image…</div>
           </div>
           <aside class="quality-panel">
-            <p class="kicker">Photo check</p>
-            <h2 id="quality-title">Looking closely…</h2>
+            <p class="kicker" data-i18n="photoCheck">Photo check</p>
+            <h2 id="quality-title" data-i18n="looking">Looking closely…</h2>
             <div class="quality-list" id="quality-list"></div>
-            <div class="tip-box"><span>☀</span><p><strong>Best results</strong>Place the paper on a dark, flat surface near a window. Avoid flash glare.</p></div>
-            <button class="button primary full" id="analyze-button">Read my prescription <span>→</span></button>
-            <button class="button text-button full" id="retake-button">Choose a different photo</button>
+            <div class="tip-box"><span>☀</span><p><strong data-i18n="bestResults">Best results</strong><span data-i18n="bestResultsCopy">Place the paper on a dark, flat surface near a window. Avoid flash glare.</span></p></div>
+            <button class="button primary full" id="analyze-button" data-i18n="readPrescription">Read my prescription →</button>
+            <button class="button text-button full" id="retake-button" data-i18n="differentPhoto">Choose a different photo</button>
           </aside>
         </div>
       </section>
@@ -98,44 +102,44 @@
           <div class="mini-page"><i></i><i></i><i></i><i></i><i></i></div>
           <div class="scan-line"></div>
         </div>
-        <p class="kicker">Reading carefully</p>
-        <h1 id="loading-title">Finding medicine names…</h1>
-        <p>This usually takes less than a minute. Please keep this page open.</p>
+        <p class="kicker" data-i18n="readingCarefully">Reading carefully</p>
+        <h1 id="loading-title" data-i18n="findingNames">Finding medicine names…</h1>
+        <p data-i18n="loadingCopy">This usually takes less than a minute. Please keep this page open.</p>
         <div class="loading-steps">
-          <span class="active">Reading the page</span><span>Organizing medicines</span><span>Making it simple</span>
+          <span class="active" data-i18n="readingPage">Reading the page</span><span data-i18n="organizing">Organizing medicines</span><span data-i18n="simplifying">Making it simple</span>
         </div>
       </section>
 
       <section class="workspace hidden" id="results-screen" aria-labelledby="results-title">
         <div class="results-topbar">
-          <button class="back-link" data-back>← Scan another</button>
+          <button class="back-link" data-back data-i18n="scanAnother">← Scan another</button>
           <div class="result-actions">
-            <button class="icon-button" id="copy-button">Copy</button>
-            <button class="icon-button" id="download-button">Download</button>
-            <button class="icon-button" id="print-button">Print</button>
+            <button class="icon-button" id="copy-button" data-i18n="copy">Copy</button>
+            <button class="icon-button" id="download-button" data-i18n="download">Download</button>
+            <button class="icon-button" id="print-button" data-i18n="print">Print</button>
           </div>
         </div>
         <div class="step-indicator complete"><b>1</b><span></span><b>2</b><span></span><b>3</b></div>
         <div class="results-heading">
           <div class="success-mark">✓</div>
-          <div><p class="kicker">Your medicine guide</p><h1 id="results-title">Here's what we found</h1><p id="results-summary"></p></div>
+          <div><p class="kicker" data-i18n="guide">Your medicine guide</p><h1 id="results-title" data-i18n="found">Here's what we found</h1><p id="results-summary"></p></div>
         </div>
 
         <div class="safety-banner">
           <span>!</span>
-          <p><strong>Check before taking anything.</strong> AI can misread handwriting or labels. Compare every name and direction with the original prescription, then confirm with a pharmacist or doctor. Never change a dose based on this guide.</p>
+          <p><strong data-i18n="safetyTitle">Check before taking anything.</strong> <span data-i18n="safetyCopy">AI can misread handwriting or labels. Compare every name and direction with the original prescription, then confirm with a pharmacist or doctor. Never change a dose based on this guide.</span></p>
         </div>
 
         <div class="medicine-list" id="medicine-list"></div>
 
         <div class="notes-card hidden" id="notes-card">
-          <p class="kicker">Other notes on the prescription</p>
+          <p class="kicker" data-i18n="otherNotes">Other notes on the prescription</p>
           <p id="notes-text"></p>
         </div>
 
         <div class="results-footer">
-          <p><strong>Not sure about something?</strong><br />Bring this guide and the original prescription to your pharmacist.</p>
-          <button class="button secondary" data-back>Scan another prescription</button>
+          <p><strong data-i18n="unsure">Not sure about something?</strong><br /><span data-i18n="pharmacist">Bring this guide and the original prescription to your pharmacist.</span></p>
+          <button class="button secondary" data-back data-i18n="scanAnotherPrescription">Scan another prescription</button>
         </div>
       </section>
 
@@ -144,9 +148,10 @@
 
     <footer>
       <span>ScriptSimple</span>
-      <p>Clarity for the people you care for.</p>
-      <small>Educational aid only — not medical advice or a substitute for your prescription label.</small>
+      <p data-i18n="footer">Clarity for the people you care for.</p>
+      <small data-i18n="footerDisclaimer">Educational aid only — not medical advice or a substitute for your prescription label.</small>
     </footer>
+    <script src="i18n.js"></script>
     <script src="app.js" defer></script>
   </body>
 </html>
