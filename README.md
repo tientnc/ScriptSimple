@@ -1,6 +1,16 @@
 # ScriptSimple
 
-ScriptSimple turns a prescription photo into a plain-language medicine guide. It is a mobile-first Netlify prototype with no frontend framework or build step.
+ScriptSimple turns a prescription photo into a plain-language medicine guide. It is a mobile-first Netlify prototype with no frontend framework; a small build step copies the deployable frontend into `dist/`.
+
+## Live deployment
+
+- **App:** [https://scriptsimple.netlify.app](https://scriptsimple.netlify.app)
+- **Hosting:** Netlify project `scriptsimple`
+- **Production branch:** `main`
+- **Frontend publish directory:** `dist/`
+- **Serverless function:** `netlify/functions/analyze.mjs`
+
+Netlify reads the build, function, security-header, and camera-permission settings from `netlify.toml`. When continuous deployment is connected, a push to `main` creates a production deployment at the same app URL.
 
 ## What works
 
@@ -72,10 +82,10 @@ To add a language:
 
 ## Deploy to Netlify
 
-1. Create a new Netlify site from this local directory (or drag the folder into Netlify for a manual deploy).
-2. Set `OPENROUTER_API_KEY` in **Site configuration → Environment variables**.
+1. Link the Netlify `scriptsimple` project to the GitHub repository.
+2. Set `OPENROUTER_API_KEY` in **Project configuration → Environment variables**.
 3. Optionally set `OPENROUTER_VISION_MODEL` to another model whose OpenRouter metadata lists `image` as an input modality.
-4. Deploy. The publish directory is `.` and the function directory is already configured.
+4. Push to `main`. Netlify runs the build command in `netlify.toml`, publishes `dist/`, and deploys the configured function.
 
 Do not put an API key in `app.js`: browser code is public.
 
@@ -83,12 +93,12 @@ Do not put an API key in `app.js`: browser code is public.
 
 The default is `google/gemma-4-26b-a4b-it:free`. OpenRouter currently lists it as free, with image, text, and video input; text output; and structured-output support. Free-model availability and rate limits can change, so `OPENROUTER_VISION_MODEL` remains configurable.
 
-## Why GPT-OSS-120B is not the default
-
-OpenRouter currently describes GPT-OSS-120B as a `text → text` model. It cannot inspect the prescription image itself. A future two-stage version could run OCR/vision first and send only the transcription to GPT-OSS for rewriting, but one capable vision call is simpler and avoids compounding OCR errors in this prototype.
-
 ## Safety and privacy boundaries
 
 This is an educational aid, not a medication decision-maker. The prompt prevents the model from inventing dosing instructions, calls out unclear text, and asks the user to verify every item with a pharmacist or doctor. A production version should additionally include authentication or abuse controls, request-size/rate limits, a formal privacy policy and retention agreement with the AI provider, accessibility testing, adversarial evaluation on real prescription formats, and clinical/legal review before public use.
 
 Prescription images can contain protected health information. “Not saved” here means the app does not intentionally persist the image; the configured AI provider still receives it for processing, so its current privacy and data-retention terms must be reviewed before real-world use.
+
+## Contact
+
+Tien Nguyen — [tien.nguyenc23@gmail.com](mailto:tien.nguyenc23@gmail.com)

@@ -41,7 +41,11 @@
         <p class="hero-copy" data-i18n="heroCopy">Take a clear photo of a prescription. ScriptSimple turns it into a simple guide you can read, save, and share.</p>
 
         <div class="language-row">
-          <label for="language" data-i18n="explainIn">Language</label>
+          <span class="language-symbol" aria-hidden="true">文</span>
+          <div class="language-copy">
+            <label for="language" data-i18n="explainIn">Choose language</label>
+            <small data-i18n="languageHelp">The app and medicine guide will use this language.</small>
+          </div>
           <select id="language">
             <option value="en">English</option>
             <option value="vi">Tiếng Việt</option>
@@ -181,8 +185,9 @@
     </main>
 
     <footer>
-      <span>ScriptSimple</span>
+      <span class="footer-brand">ScriptSimple</span>
       <p data-i18n="footer">Clarity for the people you care for.</p>
+      <a class="footer-contact" href="mailto:tien.nguyenc23@gmail.com"><span data-i18n="contactEmail">Contact by email</span>: tien.nguyenc23@gmail.com</a>
       <small data-i18n="footerDisclaimer">Educational aid only — not medical advice or a substitute for your prescription label.</small>
     </footer>
     <script src="i18n.js"></script>
