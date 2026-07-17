@@ -6,8 +6,117 @@ const screens = {
 };
 
 const state = { image: null, fileName: '', quality: null, result: null };
-const cameraInput = document.querySelector('#camera-input');
 const uploadInput = document.querySelector('#upload-input');
+const cameraDialog = document.querySelector('#camera-dialog');
+const cameraVideo = document.querySelector('#camera-video');
+const cameraCanvas = document.querySelector('#camera-canvas');
+const cameraMessage = document.querySelector('#camera-message');
+const cameraCaptureButton = document.querySelector('#camera-capture');
+const cameraSwitchButton = document.querySelector('#camera-switch');
+let cameraStream = null;
+let videoDevices = [];
+let activeCameraIndex = 0;
+
+async function openCamera() {
+  if (typeof cameraDialog.showModal !== "function") {
+    uploadInput.click();
+    return;
+  }
+  cameraDialog.showModal();
+  cameraMessage.classList.remove('hidden', 'error');
+  cameraMessage.textContent = t('cameraStarting');
+  cameraCaptureButton.disabled = true;
+  cameraSwitchButton.classList.add('hidden');
+
+  if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+    showCameraError('cameraSecureContext');
+    return;
+  }
+
+  try {
+    await startCamera();
+  } catch (error) {
+    const key = error?.name === 'NotAllowedError'
+      ? 'cameraPermissionDenied'
+      : error?.name === 'NotFoundError'
+        ? 'cameraNotFound'
+        : 'cameraUnavailable';
+    showCameraError(key);
+  }
+}
+
+async function startCamera(deviceId) {
+  stopCameraStream();
+  const video = deviceId
+    ? { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+    : { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } };
+
+  cameraStream = await navigator.mediaDevices.getUserMedia({ video, audio: false });
+  cameraVideo.srcObject = cameraStream;
+  await cameraVideo.play();
+  cameraMessage.classList.add('hidden');
+  cameraCaptureButton.disabled = false;
+
+  videoDevices = (await navigator.mediaDevices.enumerateDevices()).filter(device => device.kind === 'videoinput');
+  const activeId = cameraStream.getVideoTracks()[0]?.getSettings().deviceId;
+  activeCameraIndex = Math.max(0, videoDevices.findIndex(device => device.deviceId === activeId));
+  cameraSwitchButton.classList.toggle('hidden', videoDevices.length < 2);
+}
+
+async function switchCamera() {
+  if (videoDevices.length < 2) return;
+  activeCameraIndex = (activeCameraIndex + 1) % videoDevices.length;
+  cameraMessage.classList.remove('hidden', 'error');
+  cameraMessage.textContent = t('cameraStarting');
+  cameraCaptureButton.disabled = true;
+  try {
+    await startCamera(videoDevices[activeCameraIndex].deviceId);
+  } catch {
+    showCameraError('cameraUnavailable');
+  }
+}
+
+function captureCameraPhoto() {
+  if (!cameraVideo.videoWidth || !cameraVideo.videoHeight) return;
+  const maxDimension = 2400;
+  const scale = Math.min(1, maxDimension / Math.max(cameraVideo.videoWidth, cameraVideo.videoHeight));
+  cameraCanvas.width = Math.round(cameraVideo.videoWidth * scale);
+  cameraCanvas.height = Math.round(cameraVideo.videoHeight * scale);
+  cameraCanvas.getContext('2d').drawImage(cameraVideo, 0, 0, cameraCanvas.width, cameraCanvas.height);
+  cameraCanvas.toBlob(blob => {
+    if (!blob) {
+      showCameraError('cameraCaptureFailed');
+      return;
+    }
+    const file = new File([blob], `scriptsimple-camera-${Date.now()}.jpg`, { type: 'image/jpeg' });
+    closeCamera();
+    handleFile(file);
+  }, 'image/jpeg', .92);
+}
+
+function showCameraError(key) {
+  stopCameraStream();
+  cameraMessage.textContent = t(key);
+  cameraMessage.classList.remove('hidden');
+  cameraMessage.classList.add('error');
+  cameraCaptureButton.disabled = true;
+}
+
+function stopCameraStream() {
+  cameraStream?.getTracks().forEach(track => track.stop());
+  cameraStream = null;
+  cameraVideo.srcObject = null;
+}
+
+function closeCamera() {
+  stopCameraStream();
+  if (cameraDialog.open) cameraDialog.close();
+}
+
+function uploadFromCameraDialog() {
+  closeCamera();
+  uploadInput.click();
+}
 const previewImage = document.querySelector('#preview-image');
 const qualityBadge = document.querySelector('#quality-badge');
 const qualityTitle = document.querySelector('#quality-title');
@@ -15,6 +124,119 @@ const qualityList = document.querySelector('#quality-list');
 const analyzeButton = document.querySelector('#analyze-button');
 const toast = document.querySelector('#toast');
 const languageSelect = document.querySelector('#language');
+const readButton = document.querySelector('#read-button');
+const textSizeButtons = [...document.querySelectorAll('[data-text-size]')];
+const speechLanguages = { en: 'en-US', vi: 'vi-VN', es: 'es-ES', zh: 'zh-CN', fr: 'fr-FR', ko: 'ko-KR' };
+let speechSession = 0;
+let speechLoading = false;
+
+function setTextSize(size) {
+  const safeSize = ['small', 'normal', 'large', 'xlarge'].includes(size) ? size : 'normal';
+  document.body.dataset.textSize = safeSize;
+  localStorage.setItem('scriptsimple-text-size', safeSize);
+  textSizeButtons.forEach(button => {
+    const active = button.dataset.textSize === safeSize;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+}
+
+function stopReading() {
+  speechSession += 1;
+  window.speechSynthesis?.cancel();
+  if (readButton) {
+    readButton.classList.remove('active');
+    readButton.textContent = t('readAloud');
+  }
+}
+
+function waitForSpeechVoices(timeout = 1800) {
+  const voices = window.speechSynthesis.getVoices();
+  if (voices.length) return Promise.resolve(voices);
+
+  return new Promise(resolve => {
+    const started = Date.now();
+    const timer = setInterval(() => {
+      const nextVoices = window.speechSynthesis.getVoices();
+      if (nextVoices.length || Date.now() - started >= timeout) {
+        clearInterval(timer);
+        resolve(nextVoices);
+      }
+    }, 100);
+  });
+}
+
+function chooseSpeechVoice(voices, languageTag) {
+  const normalizedTarget = languageTag.toLowerCase().replaceAll("_", "-");
+  const languagePrefix = normalizedTarget.split("-")[0];
+  const matchingVoices = voices.filter(voice => {
+    const normalizedVoice = voice.lang.toLowerCase().replaceAll("_", "-");
+    return normalizedVoice === normalizedTarget || normalizedVoice.startsWith(languagePrefix + "-");
+  });
+
+  return matchingVoices.find(voice => voice.lang.toLowerCase().replaceAll("_", "-") === normalizedTarget)
+    || matchingVoices.find(voice => voice.default)
+    || matchingVoices[0]
+    || null;
+}
+
+async function toggleReadAloud() {
+  if (!("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window)) {
+    showToast(t("speechUnavailable"));
+    return;
+  }
+  if (window.speechSynthesis.speaking || readButton.classList.contains("active")) {
+    stopReading();
+    return;
+  }
+  if (!state.result || speechLoading) return;
+
+  speechLoading = true;
+  const languageTag = speechLanguages[locale] || speechLanguages.en;
+  const matchingVoice = chooseSpeechVoice(await waitForSpeechVoices(), languageTag);
+  speechLoading = false;
+
+  if (!matchingVoice) {
+    showToast(t("voiceUnavailable", { language: languages[locale]?.name || locale }));
+    return;
+  }
+
+  const session = ++speechSession;
+  const sections = speechSections();
+  readButton.classList.add("active");
+  readButton.textContent = t("stopReading");
+
+  function speakSection(index) {
+    if (session !== speechSession || index >= sections.length) {
+      if (session === speechSession) stopReading();
+      return;
+    }
+    const utterance = new SpeechSynthesisUtterance(sections[index]);
+    utterance.lang = matchingVoice.lang;
+    utterance.voice = matchingVoice;
+    utterance.rate = 0.84;
+    utterance.onend = () => speakSection(index + 1);
+    utterance.onerror = () => stopReading();
+    window.speechSynthesis.speak(utterance);
+  }
+
+  speakSection(0);
+}
+
+function speechSections() {
+  const sections = [t('textImportant')];
+  state.result.medicines.forEach((medicine, index) => {
+    sections.push(
+      `${t('item')} ${index + 1}. ${medicine.name}. ${medicine.strength || ''}. ` +
+      `${t('function')}: ${medicine.function}. ` +
+      `${t('directions')}: ${medicine.directions}. ` +
+      `${t('sideEffects')}: ${medicine.sideEffects}. ` +
+      `${medicine.uncertainty ? `${t('verify')}: ${medicine.uncertainty}.` : ''}`
+    );
+  });
+  if (state.result.notes) sections.push(`${t('otherNotesText')}: ${state.result.notes}`);
+  return sections;
+}
 const { languages, messages } = window.ScriptSimpleI18n;
 let locale = localStorage.getItem('scriptsimple-language') || getSuggestedLocale();
 
@@ -32,6 +254,7 @@ function t(key, replacements = {}) {
 }
 
 function applyLocale(nextLocale) {
+  if (window.speechSynthesis?.speaking) stopReading();
   locale = languages[nextLocale] ? nextLocale : 'en';
   languageSelect.value = locale;
   localStorage.setItem('scriptsimple-language', locale);
@@ -39,6 +262,9 @@ function applyLocale(nextLocale) {
 
   document.querySelectorAll('[data-i18n]').forEach(element => {
     element.textContent = t(element.dataset.i18n);
+  });
+  document.querySelectorAll('[data-i18n-aria-label]').forEach(element => {
+    element.setAttribute('aria-label', t(element.dataset.i18nAriaLabel));
   });
   document.querySelectorAll('[data-i18n-html]').forEach(element => {
     element.innerHTML = t(element.dataset.i18nHtml);
@@ -146,25 +372,36 @@ function showScreen(name) {
 function showToast(message) {
   toast.textContent = message;
   toast.classList.add('show');
-  setTimeout(() => toast.classList.remove('show'), 2400);
+  const duration = message.length > 80 ? 5200 : 2400;
+  setTimeout(() => toast.classList.remove('show'), duration);
 }
 
-document.querySelector('#camera-button').addEventListener('click', () => cameraInput.click());
+document.querySelector('#camera-button').addEventListener('click', openCamera);
+document.querySelector('#camera-close').addEventListener('click', closeCamera);
+document.querySelector('#camera-capture').addEventListener('click', captureCameraPhoto);
+document.querySelector('#camera-switch').addEventListener('click', switchCamera);
+document.querySelector('#camera-upload-fallback').addEventListener('click', uploadFromCameraDialog);
+cameraDialog.addEventListener('close', stopCameraStream);
+cameraDialog.addEventListener('cancel', event => { event.preventDefault(); closeCamera(); });
 document.querySelector('#upload-button').addEventListener('click', () => uploadInput.click());
 document.querySelector('#retake-button').addEventListener('click', () => uploadInput.click());
-[cameraInput, uploadInput].forEach(input => input.addEventListener('change', event => handleFile(event.target.files?.[0])));
+uploadInput.addEventListener('change', event => handleFile(event.target.files?.[0]));
 document.querySelectorAll('[data-back]').forEach(button => button.addEventListener('click', reset));
 document.querySelector('#demo-button').addEventListener('click', runDemo);
 document.querySelector('#print-button').addEventListener('click', () => window.print());
 document.querySelector('#copy-button').addEventListener('click', copyResults);
 document.querySelector('#download-button').addEventListener('click', downloadResults);
+readButton.addEventListener('click', toggleReadAloud);
+textSizeButtons.forEach(button => button.addEventListener('click', () => setTextSize(button.dataset.textSize)));
 analyzeButton.addEventListener('click', analyzePrescription);
 languageSelect.addEventListener('change', event => applyLocale(event.target.value));
 applyLocale(locale);
+setTextSize(localStorage.getItem('scriptsimple-text-size') || 'normal');
 
 function reset() {
+  stopReading();
   state.image = null; state.fileName = ''; state.quality = null; state.result = null;
-  cameraInput.value = ''; uploadInput.value = '';
+  uploadInput.value = '';
   showScreen('start');
 }
 

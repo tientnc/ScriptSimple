@@ -8,7 +8,7 @@
     <title>ScriptSimple — Make prescriptions easier to understand</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&family=Noto+Serif:ital,wght@0,400;1,400&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400&family=DM+Serif+Display&family=Noto+Serif:ital,wght@0,400;1,400&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -19,10 +19,19 @@
         </span>
         <span>ScriptSimple</span>
       </a>
-      <div class="header-note">
-        <span class="privacy-dot"></span>
-        <span data-i18n="privacy">Your photo isn't saved</span>
+      <div class="header-tools">
+        <div class="text-size-control" role="group" data-i18n-aria-label="textSize" aria-label="Text size">
+          <button type="button" data-text-size="small" data-i18n-aria-label="smallerText" aria-label="Smaller text">A−</button>
+          <button type="button" data-text-size="normal" data-i18n-aria-label="standardText" aria-label="Standard text">A</button>
+          <button type="button" data-text-size="large" data-i18n-aria-label="largerText" aria-label="Larger text">A+</button>
+          <button type="button" data-text-size="xlarge" data-i18n-aria-label="largestText" aria-label="Largest text">A++</button>
+        </div>
+        <div class="header-note">
+          <span class="privacy-dot"></span>
+          <span data-i18n="privacy">Your photo isn't saved</span>
+        </div>
       </div>
+
     </header>
 
     <main>
@@ -52,17 +61,17 @@
           <h2 data-i18n="addPrescription">Add your prescription</h2>
           <p data-i18n="photoTip">Use the full page, in good light, with no glare.</p>
           <div class="capture-actions">
-            <button class="button primary" id="camera-button">
+            <button class="button primary" id="camera-button" type="button">
               <span class="button-icon" aria-hidden="true">⌾</span>
               <span data-i18n="takePhoto">Take a photo</span>
             </button>
+
             <button class="button secondary" id="upload-button">
               <span class="button-icon" aria-hidden="true">↑</span>
               <span data-i18n="uploadImage">Upload image</span>
             </button>
           </div>
-          <input id="camera-input" type="file" accept="image/*" capture="environment" hidden />
-          <input id="upload-input" type="file" accept="image/jpeg,image/png,image/webp" hidden />
+          <input id="upload-input" type="file" accept="image/jpeg,image/png,image/webp" class="visually-hidden" />
           <button class="demo-link" id="demo-button" data-i18n="trySample">No prescription handy? Try a sample →</button>
         </div>
 
@@ -114,6 +123,7 @@
         <div class="results-topbar">
           <button class="back-link" data-back data-i18n="scanAnother">← Scan another</button>
           <div class="result-actions">
+            <button class="icon-button speak-button" id="read-button" data-i18n="readAloud">Read aloud</button>
             <button class="icon-button" id="copy-button" data-i18n="copy">Copy</button>
             <button class="icon-button" id="download-button" data-i18n="download">Download</button>
             <button class="icon-button" id="print-button" data-i18n="print">Print</button>
@@ -144,6 +154,30 @@
       </section>
 
       <div class="toast" id="toast" role="status"></div>
+      <dialog class="camera-dialog" id="camera-dialog" aria-labelledby="camera-title">
+        <div class="camera-dialog-header">
+          <div>
+            <p class="kicker" data-i18n="cameraLabel">Camera</p>
+            <h2 id="camera-title" data-i18n="cameraTitle">Photograph your prescription</h2>
+          </div>
+          <button class="camera-close" id="camera-close" type="button" data-i18n-aria-label="closeCamera" aria-label="Close camera">×</button>
+        </div>
+        <p class="camera-help" data-i18n="cameraHelp">Hold the full page inside the frame and keep the device still.</p>
+        <div class="camera-stage">
+          <video id="camera-video" autoplay playsinline muted></video>
+          <div class="camera-frame" aria-hidden="true"></div>
+          <div class="camera-message" id="camera-message" role="status" data-i18n="cameraStarting">Starting camera…</div>
+        </div>
+        <div class="camera-dialog-actions">
+          <button class="button secondary hidden" id="camera-switch" type="button" data-i18n="switchCamera">Switch camera</button>
+          <button class="button primary camera-shutter" id="camera-capture" type="button" disabled>
+            <span aria-hidden="true">●</span>
+            <span data-i18n="capturePhoto">Capture photo</span>
+          </button>
+          <button class="button text-button" id="camera-upload-fallback" type="button" data-i18n="uploadInstead">Upload instead</button>
+        </div>
+        <canvas id="camera-canvas" hidden></canvas>
+      </dialog>
     </main>
 
     <footer>

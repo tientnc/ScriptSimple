@@ -4,7 +4,7 @@ ScriptSimple turns a prescription photo into a plain-language medicine guide. It
 
 ## What works
 
-- Phone camera capture and desktop/mobile file upload
+- Live browser camera capture on desktop, tablet, and phone, plus file upload
 - On-device checks for resolution, lighting, and likely blur
 - English, Vietnamese, Spanish, Simplified Chinese, French, or Korean interface and output
 - Structured medicine cards: name, function, visible directions, side effects, and uncertainty
@@ -31,6 +31,22 @@ cp .env.example .env
 # Add your real OPENROUTER_API_KEY to .env
 netlify dev
 ```
+
+## Accessibility controls
+
+The header remains visible while the page scrolls. Four saved text-size choices are available: A−, A, A+, and A++. The interface uses Be Vietnam Pro for consistent Vietnamese diacritics such as ơ and ư; Vietnamese display headings use Noto Serif. On very narrow screens, the ScriptSimple wordmark condenses to its icon so all size controls remain available.
+
+## Read-aloud behavior
+
+ScriptSimple waits for the browser to load its available speech voices and selects an exact or same-language match for the chosen interface language. It does not deliberately fall back to an English voice for non-English text. If the device has no matching voice, the app explains that a language voice must be added in the device speech settings. Browser speech quality still depends on the voices installed or provided by that device.
+
+A future production version could use a server-side text-to-speech service for consistent multilingual voices across devices, but that would add provider cost, network use, and another service that receives the generated medicine-guide text.
+
+## Camera behavior
+
+**Take a photo** opens a live browser camera window and captures a JPEG directly into the photo-review step. The browser may ask for camera permission the first time. If more than one camera is available, ScriptSimple shows a **Switch camera** button. **Upload image** always remains available as a fallback.
+
+For security, browsers only expose webcams on HTTPS pages or on `localhost`/`127.0.0.1`. If Windows is viewing this Linux server through a forwarded localhost port, the Windows browser can use the Windows webcam. A plain URL such as `http://192.168.x.x:8899` cannot open the camera; use a localhost port forward, Netlify Dev on localhost, or an HTTPS deployment.
 
 ## Languages
 
