@@ -4,12 +4,14 @@ const screens = {
   loading: document.querySelector('#loading-screen'),
   results: document.querySelector('#results-screen'),
   verify: document.querySelector('#verify-screen'),
+  verifyError: document.querySelector('#verify-error-screen'),
 };
 
 const state = { image: null, fileName: '', quality: null, result: null };
 const verificationFlow = new URLSearchParams(window.location.search).get('flow') === 'verify';
 const NORMALIZED_IMAGE_TARGET_BYTES = Math.round(3.5 * 1024 * 1024);
 const MAX_SOURCE_IMAGE_BYTES = 10 * 1024 * 1024;
+const { isExtractionTimeout, postPrescription } = window.ScriptSimpleExtractionClient;
 const uploadInput = document.querySelector('#upload-input');
 const cameraDialog = document.querySelector('#camera-dialog');
 const cameraVideo = document.querySelector('#camera-video');
@@ -124,6 +126,8 @@ const qualityBadge = document.querySelector('#quality-badge');
 const qualityTitle = document.querySelector('#quality-title');
 const qualityList = document.querySelector('#quality-list');
 const analyzeButton = document.querySelector('#analyze-button');
+const retryExtractionButton = document.querySelector('#retry-extraction-button');
+const extractionErrorHeading = document.querySelector('#extraction-error-title');
 const toast = document.querySelector('#toast');
 const languageSelect = document.querySelector('#language');
 const readButton = document.querySelector('#read-button');
@@ -396,6 +400,7 @@ document.querySelector('#download-button').addEventListener('click', downloadRes
 readButton.addEventListener('click', toggleReadAloud);
 textSizeButtons.forEach(button => button.addEventListener('click', () => setTextSize(button.dataset.textSize)));
 analyzeButton.addEventListener('click', analyzePrescription);
+retryExtractionButton.addEventListener('click', analyzePrescription);
 languageSelect.addEventListener('change', event => applyLocale(event.target.value));
 applyLocale(locale);
 setTextSize(localStorage.getItem('scriptsimple-text-size') || 'normal');
@@ -564,12 +569,19 @@ async function analyzePrescription() {
     const endpoint = verificationFlow
       ? '/.netlify/functions/extract'
       : '/.netlify/functions/analyze';
-    const response = await fetch(endpoint, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: state.image, locale })
+    const { response, payload } = await postPrescription({
+      endpoint,
+      image: state.image,
+      locale,
     });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || t('analyzeError'));
+    if (!response.ok) {
+      if (verificationFlow && isExtractionTimeout(response, payload)) {
+        await loadingPromise;
+        showExtractionTimeout();
+        return;
+      }
+      throw new Error(payload.message || payload.error || t('analyzeError'));
+    }
     await loadingPromise;
     if (verificationFlow) {
       renderExtractionDebug(payload);
@@ -582,6 +594,11 @@ async function analyzePrescription() {
     showScreen('review');
     showToast(error.message.includes('fetch') ? t('serviceError') : error.message);
   }
+}
+
+function showExtractionTimeout() {
+  showScreen('verifyError');
+  requestAnimationFrame(() => extractionErrorHeading.focus());
 }
 
 function renderExtractionDebug(result) {

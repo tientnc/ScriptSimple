@@ -90,6 +90,12 @@ export function validateImageDataUrl(value) {
 export function errorResponse(error, debugEnabled = false) {
   const known = error instanceof HttpError;
   const status = known ? error.status : 500;
+  if (known && error.code === 'upstream_timeout') {
+    return jsonResponse(status, {
+      error: 'extraction_timeout',
+      message: error.publicMessage,
+    });
+  }
   const message = known
     ? error.publicMessage
     : 'We could not extract text from that prescription safely. Try a clearer photo.';

@@ -4,6 +4,6 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "build": "rm -rf dist && mkdir -p dist && cp index.html app.js i18n.js styles.css dist/"
+    "build": "rm -rf dist && mkdir -p dist && cp index.html app.js extraction-client.js i18n.js styles.css dist/"
   }
 }

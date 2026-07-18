@@ -149,6 +149,11 @@ html[lang="vi"] .hero > h1 { line-height: 1.08; letter-spacing: -.035em; }
 .verify-heading h1 { margin: 7px 0 10px; font-family: var(--display-serif); font-size: 42px; font-weight: 400; }
 .verify-heading > p:last-child { color: var(--ink-soft); }
 .verify-output { max-width: 850px; max-height: 65vh; margin: 0 auto; padding: 20px; overflow: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); color: var(--ink); font: 12px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.extraction-error { display: grid; align-content: start; }
+.extraction-error-card { max-width: 650px; margin: 55px auto 0; padding: 34px; border: 1px solid #efbfaa; border-radius: 18px; background: var(--paper); box-shadow: var(--shadow); text-align: center; }
+.extraction-error-card h1 { margin: 8px 0 12px; font-family: var(--display-serif); font-size: 38px; font-weight: 400; }
+.extraction-error-card h1:focus { outline: 3px solid rgba(232,112,66,.35); outline-offset: 5px; }
+.extraction-error-card > p:not(.kicker) { color: var(--ink-soft); line-height: 1.6; }
 .toast { position: fixed; z-index: 10; left: 50%; bottom: 24px; transform: translate(-50%, 20px); background: var(--ink); color: white; padding: 11px 16px; border-radius: 9px; font-size: 12px; opacity: 0; pointer-events: none; transition: .25s; }.toast.show { opacity: 1; transform: translate(-50%, 0); }
 
 .camera-dialog {

@@ -2,6 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createExtractHandler } from '../netlify/functions/extract.mjs';
+import { HttpError } from '../netlify/functions/lib/http.mjs';
+import {
+  DEFAULT_REQUEST_TIMEOUT_MS,
+  requestExtraction,
+  resolveRequestTimeoutMs,
+} from '../netlify/functions/lib/openrouter.mjs';
 import {
   ExtractionValidationError,
   parseAndValidateExtractionResult,
@@ -70,6 +76,32 @@ function expectValidationCode(callback, suffix) {
   assert.throws(callback, error => {
     assert.ok(error instanceof ExtractionValidationError);
     assert.ok(error.code.endsWith(suffix), `Expected "${error.code}" to end with "${suffix}"`);
+    return true;
+  });
+}
+
+function providerResponse(content = result()) {
+  return new Response(JSON.stringify({
+    choices: [{ message: { content: JSON.stringify(content) } }],
+  }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+}
+
+function extractionRequest(overrides = {}) {
+  return requestExtraction({
+    fetchImpl: async () => providerResponse(),
+    apiKey: 'test-key',
+    model: 'test/model',
+    image: dataUrl(),
+    timeoutMs: 50,
+    ...overrides,
+  });
+}
+
+async function expectHttpError(promise, status, code) {
+  await assert.rejects(promise, error => {
+    assert.ok(error instanceof HttpError);
+    assert.equal(error.status, status);
+    assert.equal(error.code, code);
     return true;
   });
 }
@@ -203,4 +235,163 @@ test('rejects oversized input before any mocked network call', async () => {
   assert.deepEqual(await response.json(), {
     error: 'The image is too large. Please choose a smaller image.',
   });
+});
+
+test('uses the safe default and bounds configured request timeouts', () => {
+  assert.equal(resolveRequestTimeoutMs(undefined), DEFAULT_REQUEST_TIMEOUT_MS);
+  assert.equal(resolveRequestTimeoutMs('12000'), 12000);
+  assert.equal(resolveRequestTimeoutMs('invalid'), DEFAULT_REQUEST_TIMEOUT_MS);
+  assert.equal(resolveRequestTimeoutMs('99999'), 26000);
+});
+
+test('accepts a successful OpenRouter response before timeout and passes an abort signal', async () => {
+  let signal;
+  const value = await extractionRequest({
+    fetchImpl: async (_url, options) => {
+      signal = options.signal;
+      return providerResponse();
+    },
+  });
+  assert.equal(value.schemaVersion, '1.0');
+  assert.ok(signal instanceof AbortSignal);
+  assert.equal(signal.aborted, false);
+});
+
+test('aborts the OpenRouter request at the configured timeout', async () => {
+  let capturedSignal;
+  const promise = extractionRequest({
+    timeoutMs: 5,
+    fetchImpl: async (_url, options) => {
+      capturedSignal = options.signal;
+      return new Promise((_resolve, reject) => {
+        options.signal.addEventListener('abort', () => {
+          const error = new Error('aborted');
+          error.name = 'AbortError';
+          reject(error);
+        }, { once: true });
+      });
+    },
+  });
+  await expectHttpError(promise, 504, 'upstream_timeout');
+  assert.equal(capturedSignal.aborted, true);
+});
+
+test('does not misclassify an unrelated AbortError as the configured timeout', async () => {
+  const abortError = new Error('upstream aborted independently');
+  abortError.name = 'AbortError';
+  await expectHttpError(extractionRequest({
+    fetchImpl: async () => { throw abortError; },
+  }), 502, 'provider_unavailable');
+});
+
+test('clears the request timer following success', async () => {
+  const timerId = Symbol('timer');
+  const cleared = [];
+  await extractionRequest({
+    setTimeoutImpl: () => timerId,
+    clearTimeoutImpl: id => cleared.push(id),
+  });
+  assert.deepEqual(cleared, [timerId]);
+});
+
+test('clears the request timer following provider errors', async () => {
+  const timerId = Symbol('timer');
+  const cleared = [];
+  await expectHttpError(extractionRequest({
+    fetchImpl: async () => new Response('', { status: 500 }),
+    setTimeoutImpl: () => timerId,
+    clearTimeoutImpl: id => cleared.push(id),
+  }), 502, 'provider_server_error');
+  assert.deepEqual(cleared, [timerId]);
+});
+
+test('clears the request timer after it aborts the provider request', async () => {
+  const timerId = Symbol('timer');
+  const cleared = [];
+  await expectHttpError(extractionRequest({
+    fetchImpl: async (_url, options) => new Promise((_resolve, reject) => {
+      options.signal.addEventListener('abort', () => {
+        const error = new Error('aborted');
+        error.name = 'AbortError';
+        reject(error);
+      }, { once: true });
+    }),
+    setTimeoutImpl: callback => {
+      queueMicrotask(callback);
+      return timerId;
+    },
+    clearTimeoutImpl: id => cleared.push(id),
+  }), 504, 'upstream_timeout');
+  assert.deepEqual(cleared, [timerId]);
+});
+
+test('distinguishes OpenRouter HTTP 429', async () => {
+  await expectHttpError(extractionRequest({
+    fetchImpl: async () => new Response('', { status: 429 }),
+  }), 429, 'provider_rate_limited');
+});
+
+test('distinguishes OpenRouter HTTP 400', async () => {
+  await expectHttpError(extractionRequest({
+    fetchImpl: async () => new Response('', { status: 400 }),
+  }), 502, 'provider_client_error');
+});
+
+test('distinguishes OpenRouter HTTP 500', async () => {
+  await expectHttpError(extractionRequest({
+    fetchImpl: async () => new Response('', { status: 500 }),
+  }), 502, 'provider_server_error');
+});
+
+test('distinguishes malformed upstream JSON', async () => {
+  await expectHttpError(extractionRequest({
+    fetchImpl: async () => new Response('{not-json', { status: 200 }),
+  }), 502, 'provider_malformed_json');
+});
+
+test('distinguishes structurally invalid model responses with missing content', async () => {
+  await expectHttpError(extractionRequest({
+    fetchImpl: async () => new Response(JSON.stringify({ choices: [] }), { status: 200 }),
+  }), 502, 'provider_missing_content');
+});
+
+test('distinguishes extraction-schema validation failures', async () => {
+  await expectHttpError(extractionRequest({
+    fetchImpl: async () => providerResponse({ schemaVersion: '1.0' }),
+  }), 502, 'schema_validation_failed');
+});
+
+test('returns an exact safe timeout response without request contents', async () => {
+  const sensitiveMarker = 'SENSITIVE_TEST_MARKER';
+  const handler = createExtractHandler({
+    getEnv: name => ({
+      OPENROUTER_API_KEY: 'test-key',
+      OPENROUTER_REQUEST_TIMEOUT_MS: '5',
+    })[name],
+    fetchImpl: async (_url, options) => new Promise((_resolve, reject) => {
+      options.signal.addEventListener('abort', () => {
+        const error = new Error('aborted');
+        error.name = 'AbortError';
+        reject(error);
+      }, { once: true });
+    }),
+  });
+  const response = await handler(new Request('http://localhost/.netlify/functions/extract', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      image: `data:image/jpeg;base64,${Buffer.from(sensitiveMarker).toString('base64')}`,
+      locale: 'en',
+    }),
+  }));
+  const responseText = await response.text();
+
+  assert.equal(response.status, 504);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.deepEqual(JSON.parse(responseText), {
+    error: 'extraction_timeout',
+    message: 'The prescription took too long to read. Please try again.',
+  });
+  assert.equal(responseText.includes(sensitiveMarker), false);
+  assert.equal(responseText.includes('test-key'), false);
 });

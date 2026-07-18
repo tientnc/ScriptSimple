@@ -4,7 +4,7 @@ import {
   jsonResponse,
   parseExtractionRequest,
 } from './lib/http.mjs';
-import { requestExtraction } from './lib/openrouter.mjs';
+import { requestExtraction, resolveRequestTimeoutMs } from './lib/openrouter.mjs';
 
 const DEFAULT_MODEL = 'google/gemma-4-26b-a4b-it:free';
 
@@ -34,6 +34,7 @@ export function createExtractHandler({
         apiKey,
         model: getEnv('OPENROUTER_VISION_MODEL') || DEFAULT_MODEL,
         image,
+        timeoutMs: resolveRequestTimeoutMs(getEnv('OPENROUTER_REQUEST_TIMEOUT_MS')),
       });
       return jsonResponse(200, result);
     } catch (error) {

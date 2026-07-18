@@ -6,6 +6,14 @@ import {
 import { HttpError } from './http.mjs';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+export const DEFAULT_REQUEST_TIMEOUT_MS = 24_000;
+const MAX_REQUEST_TIMEOUT_MS = 26_000;
+
+export function resolveRequestTimeoutMs(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_REQUEST_TIMEOUT_MS;
+  return Math.min(Math.floor(parsed), MAX_REQUEST_TIMEOUT_MS);
+}
 
 export const EXTRACTION_PROMPT = `Extract visible text from this single prescription image. This is transcription and document structuring only.
 
@@ -31,11 +39,31 @@ export async function requestExtraction({
   apiKey,
   model,
   image,
+  timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
+  AbortControllerImpl = globalThis.AbortController,
+  setTimeoutImpl = globalThis.setTimeout,
+  clearTimeoutImpl = globalThis.clearTimeout,
 }) {
-  let upstream;
-  try {
-    upstream = await fetchImpl(OPENROUTER_URL, {
+  const controller = new AbortControllerImpl();
+  let timedOut = false;
+  let timeoutId;
+
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeoutImpl(() => {
+      timedOut = true;
+      controller.abort();
+      reject(new HttpError(
+        504,
+        'upstream_timeout',
+        'The prescription took too long to read. Please try again.',
+      ));
+    }, timeoutMs);
+  });
+
+  const upstreamRequest = async () => {
+    const upstream = await fetchImpl(OPENROUTER_URL, {
       method: 'POST',
+      signal: controller.signal,
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
@@ -58,32 +86,52 @@ export async function requestExtraction({
         },
       }),
     });
-  } catch {
-    throw new HttpError(502, 'provider_unavailable', 'The extraction service is temporarily unavailable.');
-  }
 
-  if (!upstream.ok) {
-    throw new HttpError(502, 'provider_rejected_request', 'The extraction service could not process the image.');
-  }
+    if (!upstream.ok) {
+      if (upstream.status === 429) {
+        throw new HttpError(429, 'provider_rate_limited', 'The extraction service is busy. Please try again later.');
+      }
+      if (upstream.status >= 400 && upstream.status < 500) {
+        throw new HttpError(502, 'provider_client_error', 'The extraction service could not process the image.');
+      }
+      if (upstream.status >= 500) {
+        throw new HttpError(502, 'provider_server_error', 'The extraction service is temporarily unavailable.');
+      }
+      throw new HttpError(502, 'provider_http_error', 'The extraction service returned an unexpected response.');
+    }
+
+    try {
+      return await upstream.json();
+    } catch (error) {
+      if (controller.signal.aborted) throw error;
+      throw new HttpError(502, 'provider_malformed_json', 'The extraction service returned an invalid response.');
+    }
+  };
 
   let response;
   try {
-    response = await upstream.json();
-  } catch {
-    throw new HttpError(502, 'provider_invalid_response', 'The extraction service returned an invalid response.');
+    response = await Promise.race([upstreamRequest(), timeout]);
+  } catch (error) {
+    if (timedOut || controller.signal.aborted) {
+      throw new HttpError(504, 'upstream_timeout', 'The prescription took too long to read. Please try again.');
+    }
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(502, 'provider_unavailable', 'The extraction service is temporarily unavailable.');
+  } finally {
+    clearTimeoutImpl(timeoutId);
   }
 
   const content = response?.choices?.[0]?.message?.content;
   if (content === undefined || content === null || content === '') {
-    throw new HttpError(502, 'provider_empty_response', 'The extraction service returned an empty response.');
+    throw new HttpError(502, 'provider_missing_content', 'The extraction service returned an invalid response.');
   }
 
   try {
     return parseAndValidateExtractionResult(content);
   } catch (error) {
     if (error instanceof ExtractionValidationError) {
-      throw new HttpError(502, `model_${error.code}`, 'The extraction service returned an invalid response.');
+      throw new HttpError(502, 'schema_validation_failed', 'The extraction service returned an invalid response.');
     }
-    throw new HttpError(502, 'provider_invalid_response', 'The extraction service returned an invalid response.');
+    throw new HttpError(502, 'schema_validation_failed', 'The extraction service returned an invalid response.');
   }
 }

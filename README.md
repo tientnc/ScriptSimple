@@ -49,7 +49,7 @@ The project has no runtime package dependencies. Run the extraction contract tes
 npm test
 ```
 
-The Netlify production build can also be run locally with `npm run build`. It copies `index.html`, `app.js`, `i18n.js`, and `styles.css` into `dist/`, matching `netlify.toml`.
+The Netlify production build can also be run locally with `npm run build`. It copies `index.html`, `app.js`, `extraction-client.js`, `i18n.js`, and `styles.css` into `dist/`, matching `netlify.toml`.
 
 ## Extraction-only endpoint
 
@@ -153,6 +153,8 @@ This is an educational aid, not a medication decision-maker. The prompt prevents
 Prescription images can contain protected health information. “Not saved” here means the app does not intentionally persist the image; the configured AI provider still receives it for processing, so its current privacy and data-retention terms must be reviewed before real-world use.
 
 Both endpoints return `Cache-Control: no-store`. The extraction endpoint does not log images, transcripts, prescription content, patient names, or model responses. Its user-facing failures are generic; setting `EXTRACTION_DEBUG=true` locally adds only a non-sensitive internal error code.
+
+The extraction endpoint bounds its single OpenRouter request with `OPENROUTER_REQUEST_TIMEOUT_MS`. The default is 24,000 ms and values are capped at 26,000 ms to leave time for a controlled response before Netlify's platform timeout. A timeout returns HTTP 504 with the `extraction_timeout` code; the opt-in verification flow offers a manual retry using only the normalized image already held in page memory.
 
 ## Contact
 
