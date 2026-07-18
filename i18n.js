@@ -83,6 +83,7 @@ const I18N = {
       effectsMissing: 'Ask a pharmacist about side effects and interactions.',
       fileTypeError: 'Please choose a JPG, PNG, or WebP image.',
       fileSizeError: 'That image is over 10 MB. Please choose a smaller one.',
+      imageNormalizeError: 'That image could not be prepared safely. Please choose a different photo.',
       analyzeError: 'The prescription could not be analyzed.',
       serviceError: 'The analysis service is not running. Try the sample or start Netlify Dev.',
       copied: 'Guide copied to clipboard.',

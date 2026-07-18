@@ -8,7 +8,8 @@ ScriptSimple turns a prescription photo into a plain-language medicine guide. It
 - **Hosting:** Netlify project `scriptsimple`
 - **Production branch:** `main`
 - **Frontend publish directory:** `dist/`
-- **Serverless function:** `netlify/functions/analyze.mjs`
+- **Active guide function:** `netlify/functions/analyze.mjs`
+- **Extraction-only function:** `netlify/functions/extract.mjs`
 
 Netlify reads the build, function, security-header, and camera-permission settings from `netlify.toml`. When continuous deployment is connected, a push to `main` creates a production deployment at the same app URL.
 
@@ -41,6 +42,58 @@ cp .env.example .env
 # Add your real OPENROUTER_API_KEY to .env
 netlify dev
 ```
+
+The project has no runtime package dependencies. Run the extraction contract tests with:
+
+```bash
+npm test
+```
+
+The Netlify production build can also be run locally with `npm run build`. It copies `index.html`, `app.js`, `i18n.js`, and `styles.css` into `dist/`, matching `netlify.toml`.
+
+## Extraction-only endpoint
+
+`POST /.netlify/functions/extract` accepts one normalized prescription image:
+
+```json
+{
+  "image": "data:image/jpeg;base64,...",
+  "locale": "en"
+}
+```
+
+JPEG, PNG, and WebP data URLs are accepted. The endpoint rejects malformed JSON, unsupported MIME types, and decoded image data over 4 MB. Successful responses use schema version `1.0`:
+
+```json
+{
+  "schemaVersion": "1.0",
+  "document": {
+    "languages": ["en"],
+    "fullTranscript": "Visible text in reading order",
+    "blocks": [
+      {
+        "id": "block_01",
+        "pageOrder": 1,
+        "category": "facility",
+        "rawText": "Example Hospital",
+        "legibility": "clear",
+        "sensitive": false,
+        "bbox": null
+      }
+    ]
+  },
+  "medicationCandidates": [],
+  "documentWarnings": []
+}
+```
+
+Document blocks use only these categories: `medication`, `instruction`, `patient`, `prescriber`, `facility`, `administrative`, `price_quantity`, `date`, `note`, `signature_stamp`, and `unknown`. Legibility is `clear`, `uncertain`, or `unreadable`. Medication fields (`name`, `strength`, `dosageForm`, `route`, `frequency`, `duration`, and `quantity`) each use `present`, `uncertain`, `not_present`, or `unreadable`, with both a normalized value and source text where supported. Optional bounding boxes use normalized `x`, `y`, `width`, and `height` values; the endpoint prefers `null` over guessed coordinates. Every medication candidate must cite at least one existing block ID.
+
+This endpoint has an extraction-only safety boundary: it transcribes and organizes image-supported content but does not generate drug purposes, indications, side effects, warnings, interactions, diagnoses, recommendations, or dosing advice. It preserves the printed language and explicit uncertainty. The older `analyze.mjs` medicine-guide endpoint remains active and is still the default production flow.
+
+### Temporary verification flow
+
+Start the site with Netlify Dev and open `/?flow=verify`. Upload or capture a prescription and continue from the photo review screen. Only in this opt-in mode, the frontend calls `/.netlify/functions/extract` and displays minimally formatted JSON in the page. The result is not written to local storage or analytics. Remove the query parameter to use the ordinary `analyze.mjs` guide flow.
 
 ## Accessibility controls
 
@@ -98,6 +151,8 @@ The default is `google/gemma-4-26b-a4b-it:free`. OpenRouter currently lists it a
 This is an educational aid, not a medication decision-maker. The prompt prevents the model from inventing dosing instructions, calls out unclear text, and asks the user to verify every item with a pharmacist or doctor. A production version should additionally include authentication or abuse controls, request-size/rate limits, a formal privacy policy and retention agreement with the AI provider, accessibility testing, adversarial evaluation on real prescription formats, and clinical/legal review before public use.
 
 Prescription images can contain protected health information. “Not saved” here means the app does not intentionally persist the image; the configured AI provider still receives it for processing, so its current privacy and data-retention terms must be reviewed before real-world use.
+
+Both endpoints return `Cache-Control: no-store`. The extraction endpoint does not log images, transcripts, prescription content, patient names, or model responses. Its user-facing failures are generic; setting `EXTRACTION_DEBUG=true` locally adds only a non-sensitive internal error code.
 
 ## Contact
 
