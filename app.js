@@ -3,9 +3,15 @@ const screens = {
   review: document.querySelector('#review-screen'),
   loading: document.querySelector('#loading-screen'),
   results: document.querySelector('#results-screen'),
+  verify: document.querySelector('#verify-screen'),
+  verifyError: document.querySelector('#verify-error-screen'),
 };
 
 const state = { image: null, fileName: '', quality: null, result: null };
+const verificationFlow = new URLSearchParams(window.location.search).get('flow') === 'verify';
+const NORMALIZED_IMAGE_TARGET_BYTES = Math.round(3.5 * 1024 * 1024);
+const MAX_SOURCE_IMAGE_BYTES = 10 * 1024 * 1024;
+const { isExtractionTimeout, postPrescription } = window.ScriptSimpleExtractionClient;
 const uploadInput = document.querySelector('#upload-input');
 const cameraDialog = document.querySelector('#camera-dialog');
 const cameraVideo = document.querySelector('#camera-video');
@@ -78,10 +84,8 @@ async function switchCamera() {
 
 function captureCameraPhoto() {
   if (!cameraVideo.videoWidth || !cameraVideo.videoHeight) return;
-  const maxDimension = 2400;
-  const scale = Math.min(1, maxDimension / Math.max(cameraVideo.videoWidth, cameraVideo.videoHeight));
-  cameraCanvas.width = Math.round(cameraVideo.videoWidth * scale);
-  cameraCanvas.height = Math.round(cameraVideo.videoHeight * scale);
+  cameraCanvas.width = cameraVideo.videoWidth;
+  cameraCanvas.height = cameraVideo.videoHeight;
   cameraCanvas.getContext('2d').drawImage(cameraVideo, 0, 0, cameraCanvas.width, cameraCanvas.height);
   cameraCanvas.toBlob(blob => {
     if (!blob) {
@@ -91,7 +95,7 @@ function captureCameraPhoto() {
     const file = new File([blob], `scriptsimple-camera-${Date.now()}.jpg`, { type: 'image/jpeg' });
     closeCamera();
     handleFile(file);
-  }, 'image/jpeg', .92);
+  }, 'image/jpeg', .95);
 }
 
 function showCameraError(key) {
@@ -122,6 +126,8 @@ const qualityBadge = document.querySelector('#quality-badge');
 const qualityTitle = document.querySelector('#quality-title');
 const qualityList = document.querySelector('#quality-list');
 const analyzeButton = document.querySelector('#analyze-button');
+const retryExtractionButton = document.querySelector('#retry-extraction-button');
+const extractionErrorHeading = document.querySelector('#extraction-error-title');
 const toast = document.querySelector('#toast');
 const languageSelect = document.querySelector('#language');
 const readButton = document.querySelector('#read-button');
@@ -394,6 +400,7 @@ document.querySelector('#download-button').addEventListener('click', downloadRes
 readButton.addEventListener('click', toggleReadAloud);
 textSizeButtons.forEach(button => button.addEventListener('click', () => setTextSize(button.dataset.textSize)));
 analyzeButton.addEventListener('click', analyzePrescription);
+retryExtractionButton.addEventListener('click', analyzePrescription);
 languageSelect.addEventListener('change', event => applyLocale(event.target.value));
 applyLocale(locale);
 setTextSize(localStorage.getItem('scriptsimple-text-size') || 'normal');
@@ -401,6 +408,7 @@ setTextSize(localStorage.getItem('scriptsimple-text-size') || 'normal');
 function reset() {
   stopReading();
   state.image = null; state.fileName = ''; state.quality = null; state.result = null;
+  document.querySelector('#verify-output').textContent = '';
   uploadInput.value = '';
   showScreen('start');
 }
@@ -410,23 +418,23 @@ async function handleFile(file) {
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
     showToast(t('fileTypeError')); return;
   }
-  if (file.size > 10 * 1024 * 1024) {
+  if (file.size > MAX_SOURCE_IMAGE_BYTES) {
     showToast(t('fileSizeError')); return;
   }
 
-  state.fileName = file.name;
-  state.image = await readFile(file);
-  previewImage.src = state.image;
-  qualityBadge.textContent = t('qualityChecking');
-  qualityBadge.className = 'quality-badge';
-  showScreen('review');
-
   try {
+    const normalized = await normalizePrescriptionImage(file);
+    state.fileName = file.name;
+    state.image = normalized.dataUrl;
+    previewImage.src = state.image;
+    qualityBadge.textContent = t('qualityChecking');
+    qualityBadge.className = 'quality-badge';
+    showScreen('review');
     state.quality = await inspectImage(state.image);
     renderQuality(state.quality);
   } catch {
-    state.quality = { width: 0, height: 0, brightness: 128, sharpness: 20, issues: [] };
-    renderQuality(state.quality);
+    state.image = null;
+    showToast(t('imageNormalizeError'));
   }
 }
 
@@ -434,6 +442,53 @@ function readFile(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file);
+  });
+}
+
+async function normalizePrescriptionImage(fileOrBlob) {
+  if (!(fileOrBlob instanceof Blob)) throw new Error('invalid_image');
+
+  const sourceUrl = URL.createObjectURL(fileOrBlob);
+  const sourceImage = new Image();
+  try {
+    sourceImage.src = sourceUrl;
+    await sourceImage.decode();
+
+    const sourceWidth = sourceImage.naturalWidth;
+    const sourceHeight = sourceImage.naturalHeight;
+    if (!sourceWidth || !sourceHeight) throw new Error('image_decode_failed');
+
+    const initialScale = Math.min(1, 2200 / Math.max(sourceWidth, sourceHeight));
+    let width = Math.max(1, Math.round(sourceWidth * initialScale));
+    let height = Math.max(1, Math.round(sourceHeight * initialScale));
+    const qualitySteps = [.82, .72, .62, .52];
+
+    for (let dimensionAttempt = 0; dimensionAttempt < 6; dimensionAttempt += 1) {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext('2d').drawImage(sourceImage, 0, 0, width, height);
+
+      for (const quality of qualitySteps) {
+        const blob = await canvasToBlob(canvas, 'image/jpeg', quality);
+        if (blob.size <= NORMALIZED_IMAGE_TARGET_BYTES) {
+          return { blob, dataUrl: await readFile(blob), width, height };
+        }
+      }
+
+      width = Math.max(1, Math.round(width * .82));
+      height = Math.max(1, Math.round(height * .82));
+    }
+  } finally {
+    URL.revokeObjectURL(sourceUrl);
+  }
+
+  throw new Error('image_cannot_be_reduced');
+}
+
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('image_encode_failed')), type, quality);
   });
 }
 
@@ -511,20 +566,45 @@ async function analyzePrescription() {
   showScreen('loading');
   const loadingPromise = animateLoading(1600);
   try {
-    const response = await fetch('/.netlify/functions/analyze', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: state.image, locale })
+    const endpoint = verificationFlow
+      ? '/.netlify/functions/extract'
+      : '/.netlify/functions/analyze';
+    const { response, payload } = await postPrescription({
+      endpoint,
+      image: state.image,
+      locale,
     });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || t('analyzeError'));
+    if (!response.ok) {
+      if (verificationFlow && isExtractionTimeout(response, payload)) {
+        await loadingPromise;
+        showExtractionTimeout();
+        return;
+      }
+      throw new Error(payload.message || payload.error || t('analyzeError'));
+    }
     await loadingPromise;
-    state.result = payload;
-    renderResults(payload, payload.demo === true);
+    if (verificationFlow) {
+      renderExtractionDebug(payload);
+    } else {
+      state.result = payload;
+      renderResults(payload, payload.demo === true);
+    }
   } catch (error) {
     await loadingPromise;
     showScreen('review');
     showToast(error.message.includes('fetch') ? t('serviceError') : error.message);
   }
+}
+
+function showExtractionTimeout() {
+  showScreen('verifyError');
+  requestAnimationFrame(() => extractionErrorHeading.focus());
+}
+
+function renderExtractionDebug(result) {
+  const output = document.querySelector('#verify-output');
+  output.textContent = JSON.stringify(result, null, 2);
+  showScreen('verify');
 }
 
 async function animateLoading(minimum) {

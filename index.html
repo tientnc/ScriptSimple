@@ -157,6 +157,26 @@
         </div>
       </section>
 
+      <section class="workspace hidden" id="verify-screen" aria-labelledby="verify-title">
+        <button class="back-link" data-back data-i18n="startOver">← Start over</button>
+        <div class="verify-heading">
+          <p class="kicker" data-i18n="verifyKicker">Development verification</p>
+          <h1 id="verify-title" data-i18n="verifyTitle">Extraction-only result</h1>
+          <p data-i18n="verifyMessage">Visible prescription content is shown below for this session only.</p>
+        </div>
+        <pre class="verify-output" id="verify-output"></pre>
+      </section>
+
+      <section class="workspace extraction-error hidden" id="verify-error-screen" role="alert" aria-live="assertive" aria-atomic="true" aria-labelledby="extraction-error-title">
+        <button class="back-link" data-back data-i18n="startOver">← Start over</button>
+        <div class="extraction-error-card">
+          <p class="kicker" data-i18n="extractionTimeoutKicker">Reading paused</p>
+          <h1 id="extraction-error-title" tabindex="-1" data-i18n="extractionTimeoutTitle">The prescription took too long to read</h1>
+          <p data-i18n="extractionTimeoutMessage">Please try again. Your prepared photo is still available on this page.</p>
+          <button class="button primary" id="retry-extraction-button" type="button" data-i18n="retryExtraction">Retry extraction</button>
+        </div>
+      </section>
+
       <div class="toast" id="toast" role="status"></div>
       <dialog class="camera-dialog" id="camera-dialog" aria-labelledby="camera-title">
         <div class="camera-dialog-header">
@@ -191,6 +211,7 @@
       <small data-i18n="footerDisclaimer">Educational aid only — not medical advice or a substitute for your prescription label.</small>
     </footer>
     <script src="i18n.js"></script>
+    <script src="extraction-client.js"></script>
     <script src="app.js" defer></script>
   </body>
 </html>

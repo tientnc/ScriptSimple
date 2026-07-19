@@ -1,5 +1,5 @@
 [build]
-  command = "rm -rf dist && mkdir -p dist && cp index.html app.js i18n.js styles.css dist/"
+  command = "rm -rf dist && mkdir -p dist && cp index.html app.js extraction-client.js i18n.js styles.css dist/"
   publish = "dist"
   functions = "netlify/functions"
 
