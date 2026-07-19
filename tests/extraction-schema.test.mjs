@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import { createExtractHandler } from '../netlify/functions/extract.mjs';
 import { HttpError } from '../netlify/functions/lib/http.mjs';
+import { requestGeminiExtraction } from '../netlify/functions/lib/gemini.mjs';
 import {
   DEFAULT_REQUEST_TIMEOUT_MS,
   requestExtraction,
@@ -91,6 +92,23 @@ function extractionRequest(overrides = {}) {
     fetchImpl: async () => providerResponse(),
     apiKey: 'test-key',
     model: 'test/model',
+    image: dataUrl(),
+    timeoutMs: 50,
+    ...overrides,
+  });
+}
+
+function geminiProviderResponse(content = result()) {
+  return new Response(JSON.stringify({
+    candidates: [{ content: { parts: [{ text: JSON.stringify(content) }] } }],
+  }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+}
+
+function geminiRequest(overrides = {}) {
+  return requestGeminiExtraction({
+    fetchImpl: async () => geminiProviderResponse(),
+    apiKey: 'gemini-test-key',
+    model: 'gemini-3.1-flash-lite',
     image: dataUrl(),
     timeoutMs: 50,
     ...overrides,
@@ -394,4 +412,150 @@ test('returns an exact safe timeout response without request contents', async ()
   });
   assert.equal(responseText.includes(sensitiveMarker), false);
   assert.equal(responseText.includes('test-key'), false);
+});
+
+test('selects Gemini and preserves structured extraction output', async () => {
+  let requestUrl;
+  let requestOptions;
+  const handler = createExtractHandler({
+    getEnv: name => ({
+      EXTRACTION_PROVIDER: 'gemini',
+      GEMINI_API_KEY: 'gemini-test-key',
+      GEMINI_VISION_MODEL: 'gemini-3.1-flash-lite',
+      OPENROUTER_REQUEST_TIMEOUT_MS: '50',
+    })[name],
+    fetchImpl: async (url, options) => {
+      requestUrl = url;
+      requestOptions = options;
+      return new Response(JSON.stringify({
+        candidates: [{ content: { parts: [{ text: JSON.stringify(result()) }] } }],
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    },
+  });
+  const response = await handler(new Request('http://localhost/.netlify/functions/extract', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image: dataUrl(), locale: 'en' }),
+  }));
+  const requestBody = JSON.parse(requestOptions.body);
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), result());
+  assert.match(requestUrl, /gemini-3\.1-flash-lite:generateContent$/);
+  assert.equal(requestOptions.headers['x-goog-api-key'], 'gemini-test-key');
+  assert.equal(requestBody.contents[0].parts[1].inlineData.mimeType, 'image/jpeg');
+  assert.deepEqual(requestBody.generationConfig.responseJsonSchema.properties.schemaVersion.enum, ['1.0']);
+  assert.equal('const' in requestBody.generationConfig.responseJsonSchema.properties.schemaVersion, false);
+});
+
+test('Gemini uses the same controlled timeout and clears its timer', async () => {
+  const timerId = Symbol('gemini-timer');
+  const cleared = [];
+  await expectHttpError(requestGeminiExtraction({
+    fetchImpl: async (_url, options) => new Promise((_resolve, reject) => {
+      options.signal.addEventListener('abort', () => {
+        const error = new Error('aborted');
+        error.name = 'AbortError';
+        reject(error);
+      }, { once: true });
+    }),
+    apiKey: 'gemini-test-key',
+    model: 'gemini-3.1-flash-lite',
+    image: dataUrl(),
+    timeoutMs: 5,
+    setTimeoutImpl: callback => {
+      queueMicrotask(callback);
+      return timerId;
+    },
+    clearTimeoutImpl: id => cleared.push(id),
+  }), 504, 'upstream_timeout');
+  assert.deepEqual(cleared, [timerId]);
+});
+
+test('Gemini clears its timer after success', async () => {
+  const timerId = Symbol('gemini-success-timer');
+  const cleared = [];
+  const value = await geminiRequest({
+    setTimeoutImpl: () => timerId,
+    clearTimeoutImpl: id => cleared.push(id),
+  });
+  assert.equal(value.schemaVersion, '1.0');
+  assert.deepEqual(cleared, [timerId]);
+});
+
+test('Gemini does not misclassify an unrelated AbortError as a timeout', async () => {
+  const abortError = new Error('upstream aborted independently');
+  abortError.name = 'AbortError';
+  await expectHttpError(geminiRequest({
+    fetchImpl: async () => { throw abortError; },
+  }), 502, 'provider_unavailable');
+});
+
+test('Gemini distinguishes provider HTTP responses', async t => {
+  for (const [status, expectedStatus, code] of [
+    [429, 429, 'provider_rate_limited'],
+    [400, 502, 'provider_client_error'],
+    [500, 502, 'provider_server_error'],
+  ]) {
+    await t.test(String(status), async () => {
+      await expectHttpError(geminiRequest({
+        fetchImpl: async () => new Response('', { status }),
+      }), expectedStatus, code);
+    });
+  }
+});
+
+test('Gemini distinguishes malformed upstream JSON', async () => {
+  await expectHttpError(geminiRequest({
+    fetchImpl: async () => new Response('{not-json', { status: 200 }),
+  }), 502, 'provider_malformed_json');
+});
+
+test('Gemini distinguishes missing structured content', async () => {
+  await expectHttpError(geminiRequest({
+    fetchImpl: async () => new Response(JSON.stringify({ candidates: [] }), { status: 200 }),
+  }), 502, 'provider_missing_content');
+});
+
+test('Gemini distinguishes extraction-schema validation failures', async () => {
+  await expectHttpError(geminiRequest({
+    fetchImpl: async () => geminiProviderResponse({ schemaVersion: '1.0' }),
+  }), 502, 'schema_validation_failed');
+});
+
+test('Gemini returns the exact safe timeout response without sensitive contents', async () => {
+  const sensitiveMarker = 'SENSITIVE_GEMINI_TEST_MARKER';
+  const handler = createExtractHandler({
+    getEnv: name => ({
+      EXTRACTION_PROVIDER: 'gemini',
+      GEMINI_API_KEY: 'gemini-test-key',
+      GEMINI_VISION_MODEL: 'gemini-3.1-flash-lite',
+      OPENROUTER_REQUEST_TIMEOUT_MS: '5',
+    })[name],
+    fetchImpl: async (_url, options) => new Promise((_resolve, reject) => {
+      options.signal.addEventListener('abort', () => {
+        const error = new Error('aborted');
+        error.name = 'AbortError';
+        reject(error);
+      }, { once: true });
+    }),
+  });
+  const response = await handler(new Request('http://localhost/.netlify/functions/extract', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      image: `data:image/jpeg;base64,${Buffer.from(sensitiveMarker).toString('base64')}`,
+      locale: 'en',
+    }),
+  }));
+  const responseText = await response.text();
+
+  assert.equal(response.status, 504);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.deepEqual(JSON.parse(responseText), {
+    error: 'extraction_timeout',
+    message: 'The prescription took too long to read. Please try again.',
+  });
+  assert.equal(responseText.includes(sensitiveMarker), false);
+  assert.equal(responseText.includes('gemini-test-key'), false);
 });
