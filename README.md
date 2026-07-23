@@ -156,7 +156,7 @@ Both endpoints return `Cache-Control: no-store`. The extraction endpoint does no
 
 The extraction endpoint bounds its single provider request with `OPENROUTER_REQUEST_TIMEOUT_MS`. The default is 24,000 ms and values are capped at 26,000 ms to leave time for a controlled response before Netlify's platform timeout. A timeout returns HTTP 504 with the `extraction_timeout` code; the opt-in verification flow offers a manual retry using only the normalized image already held in page memory.
 
-Set `EXTRACTION_PROVIDER=gemini`, `GEMINI_API_KEY`, and `GEMINI_VISION_MODEL=gemini-3.1-flash-lite` to use Gemini instead of the default OpenRouter provider. Both providers use the same extraction schema and bounded timeout behavior.
+Set `EXTRACTION_PROVIDER=gemini`, `GEMINI_API_KEY`, and `GEMINI_VISION_MODEL=gemini-3.1-flash-lite` to use Gemini instead of the default OpenRouter provider. The selection applies to both `extract.mjs` and `analyze.mjs`; each keeps its own structured response schema and the same bounded timeout behavior.
 
 ## Contact
 
