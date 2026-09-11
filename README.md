@@ -158,6 +158,11 @@ The extraction endpoint bounds its single provider request with `OPENROUTER_REQU
 
 Set `EXTRACTION_PROVIDER=gemini`, `GEMINI_API_KEY`, and `GEMINI_VISION_MODEL=gemini-3.1-flash-lite` to use Gemini instead of the default OpenRouter provider. The selection applies to both `extract.mjs` and `analyze.mjs`; each keeps its own structured response schema and the same bounded timeout behavior.
 
+## TBD
+
+- Add limits for API call
+- Smoothen usage
+
 ## Contact
 
 Tien Nguyen — [tien.nguyenc23@gmail.com](mailto:tien.nguyenc23@gmail.com)
