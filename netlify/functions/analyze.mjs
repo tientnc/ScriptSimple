@@ -23,7 +23,7 @@ export function createAnalyzeHandler({
     }
 
     try {
-      const provider = (getEnv('EXTRACTION_PROVIDER') || 'openrouter').toLowerCase();
+      const provider = (getEnv('EXTRACTION_PROVIDER') || 'gemini').toLowerCase();
       if (!['gemini', 'openrouter'].includes(provider)) {
         throw new HttpError(503, 'unsupported_provider', 'Analysis is not configured.');
       }

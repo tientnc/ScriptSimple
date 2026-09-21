@@ -71,6 +71,7 @@ html[lang="vi"] .hero > h1 { line-height: 1.08; letter-spacing: -.035em; }
 .scan-corner { position: absolute; width: 19px; height: 19px; border-color: var(--orange); border-style: solid; }
 .c1 { left: -10px; top: -10px; border-width: 2px 0 0 2px; }.c2 { right: -10px; top: -10px; border-width: 2px 2px 0 0; }.c3 { left: -10px; bottom: -10px; border-width: 0 0 2px 2px; }.c4 { right: -10px; bottom: -10px; border-width: 0 2px 2px 0; }
 .capture-actions { display: flex; justify-content: center; gap: 10px; margin: 22px 0 17px; }
+.capture-card > .quota-note { max-width: 540px; margin: 18px auto 0; color: var(--ink-soft); font-size: 12px; line-height: 1.5; }
 .button { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; border-radius: 11px; padding: 0 22px; border: 1px solid transparent; font-weight: 700; cursor: pointer; transition: transform .18s, box-shadow .18s, background .18s; }
 .button:hover { transform: translateY(-2px); }
 .button.primary { color: white; background: var(--green); box-shadow: 0 8px 20px rgba(30,91,73,.18); }
@@ -186,6 +187,7 @@ footer { border-top: 1px solid rgba(24,51,45,.1); max-width: 1120px; margin: aut
 .footer-brand { font-weight: 700; }
 footer p { margin: 0; font-family: var(--display-serif); font-size: 18px; }
 .footer-contact { grid-column: 1/-1; justify-self: start; margin-top: 13px; color: var(--green); font-size: 12px; font-weight: 600; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.footer-github { grid-column: 1/-1; justify-self: start; margin-top: 8px; color: var(--green); font-size: 12px; font-weight: 600; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 footer small { grid-column: 1/-1; color: var(--ink-soft); margin-top: 8px; font-size: 10px; }
 
 @media (max-width: 760px) {
@@ -214,6 +216,7 @@ footer small { grid-column: 1/-1; color: var(--ink-soft); margin-top: 8px; font-
   .camera-dialog-actions .button { width: 100%; }
   footer { grid-template-columns: 1fr; gap: 7px; text-align: center; }
   .footer-contact { grid-column: 1; justify-self: center; margin-top: 5px; }
+  .footer-github { grid-column: 1; justify-self: center; margin-top: 0; }
   footer small { grid-column: 1; margin-top: 2px; }
 }
 

@@ -25,7 +25,7 @@ export function createExtractHandler({
     }
 
     try {
-      const provider = (getEnv('EXTRACTION_PROVIDER') || 'openrouter').toLowerCase();
+      const provider = (getEnv('EXTRACTION_PROVIDER') || 'gemini').toLowerCase();
       const isGemini = provider === 'gemini';
       if (!isGemini && provider !== 'openrouter') {
         throw new HttpError(503, 'unsupported_provider', 'Extraction is not configured.');
