@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#f6f3eb" />
     <meta name="description" content="Turn a prescription photo into a clear, easy-to-read medicine guide." />
-    <title>ScriptSimple — Make prescriptions easier to understand</title>
+    <title>ScriptSimple - Make prescriptions easier to understand</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400&family=DM+Serif+Display&family=Noto+Serif:ital,wght@0,400;1,400&display=swap" rel="stylesheet" />
@@ -77,6 +77,7 @@
           </div>
           <input id="upload-input" type="file" accept="image/jpeg,image/png,image/webp" class="visually-hidden" />
           <button class="demo-link" id="demo-button" data-i18n="trySample">No prescription handy? Try a sample →</button>
+          <p class="quota-note">This app uses one shared AI Studio key. Requests may wait or be declined when provider RPM or RPD limits are reached.</p>
         </div>
 
         <div class="trust-row">
@@ -117,7 +118,7 @@
         </div>
         <p class="kicker" data-i18n="readingCarefully">Reading carefully</p>
         <h1 id="loading-title" data-i18n="findingNames">Finding medicine names…</h1>
-        <p data-i18n="loadingCopy">This usually takes less than a minute. Please keep this page open.</p>
+        <p data-i18n="loadingCopy">This usually takes less than a minute. Your request may wait briefly to protect the shared AI Studio quota.</p>
         <div class="loading-steps">
           <span class="active" data-i18n="readingPage">Reading the page</span><span data-i18n="organizing">Organizing medicines</span><span data-i18n="simplifying">Making it simple</span>
         </div>
@@ -208,7 +209,8 @@
       <span class="footer-brand">ScriptSimple</span>
       <p data-i18n="footer">Clarity for the people you care for.</p>
       <a class="footer-contact" href="mailto:tien.nguyenc23@gmail.com"><span data-i18n="contactEmail">Contact by email</span>: tien.nguyenc23@gmail.com</a>
-      <small data-i18n="footerDisclaimer">Educational aid only — not medical advice or a substitute for your prescription label.</small>
+      <a class="footer-github" href="https://github.com/tientnc/ScriptSimple" target="_blank" rel="noreferrer">View or change the model on GitHub</a>
+      <small data-i18n="footerDisclaimer">Educational aid only - not medical advice or a substitute for your prescription label.</small>
     </footer>
     <script src="i18n.js"></script>
     <script src="extraction-client.js"></script>

@@ -135,6 +135,7 @@ const textSizeButtons = [...document.querySelectorAll('[data-text-size]')];
 const speechLanguages = { en: 'en-US', vi: 'vi-VN', es: 'es-ES', zh: 'zh-CN', fr: 'fr-FR', ko: 'ko-KR' };
 let speechSession = 0;
 let speechLoading = false;
+let analysisInProgress = false;
 
 function setTextSize(size) {
   const safeSize = ['small', 'normal', 'large', 'xlarge'].includes(size) ? size : 'normal';
@@ -244,12 +245,8 @@ function speechSections() {
   return sections;
 }
 const { languages, messages } = window.ScriptSimpleI18n;
-let locale = localStorage.getItem('scriptsimple-language') || getSuggestedLocale();
+let locale = localStorage.getItem('scriptsimple-language') || 'en';
 
-function getSuggestedLocale() {
-  const browserLocale = navigator.language?.toLowerCase() || 'en';
-  return Object.keys(languages).find(code => browserLocale === code || browserLocale.startsWith(`${code}-`)) || 'en';
-}
 
 function t(key, replacements = {}) {
   const template = messages[locale]?.[key] ?? messages.en[key] ?? key;
@@ -304,7 +301,7 @@ const demoResult = {
       uncertainty: 'The timing on this line is not fully clear. Please confirm it with the pharmacist.'
     }
   ],
-  notes: 'Sample only — these are fictional demo results and are not instructions for you.',
+  notes: 'Sample only - these are fictional demo results and are not instructions for you.',
   disclaimer: 'This guide may contain errors. Verify it against the original prescription with a pharmacist or doctor.'
 };
 
@@ -317,7 +314,7 @@ const localizedDemoResults = {
       sideEffects: 'Thường gặp: buồn nôn, tiêu chảy hoặc phát ban nhẹ. Cần trợ giúp khẩn cấp nếu khó thở hoặc sưng mặt, cổ họng.',
       uncertainty: ''
     }],
-    notes: 'Chỉ là ví dụ — đây là thông tin giả định, không phải hướng dẫn dành cho bạn.',
+    notes: 'Chỉ là ví dụ - đây là thông tin giả định, không phải hướng dẫn dành cho bạn.',
     disclaimer: 'Hãy đối chiếu mọi thông tin với đơn gốc và dược sĩ.'
   },
   es: {
@@ -339,7 +336,7 @@ const localizedDemoResults = {
       sideEffects: '常见副作用包括恶心、腹泻或轻微皮疹。如出现呼吸困难或面部、喉咙肿胀，请立即求助。',
       uncertainty: ''
     }],
-    notes: '仅为示例——这些是虚构信息，并非给您的用药说明。',
+    notes: '仅为示例--这些是虚构信息，并非给您的用药说明。',
     disclaimer: '请将所有信息与原处方核对，并向药剂师确认。'
   },
   fr: {
@@ -562,7 +559,10 @@ async function runDemo() {
 }
 
 async function analyzePrescription() {
-  if (!state.image) return;
+  if (!state.image || analysisInProgress) return;
+  analysisInProgress = true;
+  analyzeButton.disabled = true;
+  retryExtractionButton.disabled = true;
   showScreen('loading');
   const loadingPromise = animateLoading(1600);
   try {
@@ -593,6 +593,10 @@ async function analyzePrescription() {
     await loadingPromise;
     showScreen('review');
     showToast(error.message.includes('fetch') ? t('serviceError') : error.message);
+  } finally {
+    analysisInProgress = false;
+    analyzeButton.disabled = false;
+    retryExtractionButton.disabled = false;
   }
 }
 
@@ -651,7 +655,7 @@ function resultAsText() {
   const lines = [t('textTitle'), '', t('textImportant'), ''];
   state.result.medicines.forEach((medicine, index) => {
     lines.push(
-      `${t('item')} ${index + 1}: ${medicine.name}${medicine.strength ? ` — ${medicine.strength}` : ''}`,
+      `${t('item')} ${index + 1}: ${medicine.name}${medicine.strength ? ` - ${medicine.strength}` : ''}`,
       `${t('function')}: ${medicine.function}`,
       `${t('directions')}: ${medicine.directions}`,
       `${t('sideEffects')}: ${medicine.sideEffects}`

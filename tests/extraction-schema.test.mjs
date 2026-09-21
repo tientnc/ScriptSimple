@@ -128,7 +128,7 @@ test('accepts a valid response with zero medications through a mocked provider',
   const expected = result();
   let providerCalls = 0;
   const handler = createExtractHandler({
-    getEnv: name => name === 'OPENROUTER_API_KEY' ? 'test-key' : undefined,
+    getEnv: name => ({ EXTRACTION_PROVIDER: 'openrouter', OPENROUTER_API_KEY: 'test-key' })[name],
     fetchImpl: async (_url, options) => {
       providerCalls += 1;
       const requestBody = JSON.parse(options.body);
@@ -236,7 +236,7 @@ test('rejects malformed model JSON', () => {
 test('rejects oversized input before any mocked network call', async () => {
   let providerCalled = false;
   const handler = createExtractHandler({
-    getEnv: name => name === 'OPENROUTER_API_KEY' ? 'test-key' : undefined,
+    getEnv: name => ({ EXTRACTION_PROVIDER: 'openrouter', OPENROUTER_API_KEY: 'test-key' })[name],
     fetchImpl: async () => {
       providerCalled = true;
       throw new Error('network should not be called');
@@ -383,6 +383,7 @@ test('returns an exact safe timeout response without request contents', async ()
   const sensitiveMarker = 'SENSITIVE_TEST_MARKER';
   const handler = createExtractHandler({
     getEnv: name => ({
+      EXTRACTION_PROVIDER: 'openrouter',
       OPENROUTER_API_KEY: 'test-key',
       OPENROUTER_REQUEST_TIMEOUT_MS: '5',
     })[name],
